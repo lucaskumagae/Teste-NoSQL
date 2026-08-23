@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Galpão</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <main class="login-container">
+
+        <section class="login-card">
+
+            <h1>Seu galpão</h1>
+
+            <p>Crie um galpão novo ou entre em um existente</p>
+
+            <button id="logout-btn" style="width: auto; padding: 8px 16px;">
+                Sair
+            </button>
+
+            <form id="criar-galpao-form">
+
+                <div class="form-group">
+                    <label for="nome-galpao">Nome do galpão</label>
+
+                    <input
+                        type="text"
+                        id="nome-galpao"
+                        placeholder="Ex: Galpão Central"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="endereco-galpao">Endereço</label>
+
+                    <input
+                        type="text"
+                        id="endereco-galpao"
+                        placeholder="Ex: Rua das Flores, 123"
+                    >
+                </div>
+
+                <button type="submit">
+                    Criar galpão
+                </button>
+
+            </form>
+
+            <p id="criar-message"></p>
+
+            <hr style="margin: 20px 0;">
+
+            <form id="entrar-galpao-form">
+
+                <div class="form-group">
+                    <label for="codigo-galpao">Código do galpão</label>
+
+                    <input
+                        type="text"
+                        id="codigo-galpao"
+                        placeholder="Cole o código recebido"
+                        required
+                    >
+                </div>
+
+                <button type="submit">
+                    Entrar no galpão
+                </button>
+
+            </form>
+
+            <p id="entrar-message"></p>
+
+        </section>
+
+    </main>
+
+    <script type="module" src="js/galpao.js"></script>
+
+</body>
+</html>

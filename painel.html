@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Painel do Galpão</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <main style="max-width: 700px; margin: 40px auto; padding: 0 20px;">
+
+        <h1 id="galpao-nome">Carregando galpão...</h1>
+        <p>Código do galpão: <span id="galpao-codigo"></span></p>
+
+        <button id="logout-btn" style="width: auto; padding: 8px 16px;">
+            Sair
+        </button>
+        
+        <a href="galpao.html">Cadastrar novo Galpão</a>
+
+        <a id="trocar-galpao" href="selecionar-galpao.html" style="display: none; margin-left: 10px;">
+            Trocar de galpão
+        </a>
+
+        <hr style="margin: 20px 0;">
+
+        <h2 id="form-titulo">Novo produto</h2>
+
+        <form id="produto-form">
+
+            <input type="hidden" id="produto-id">
+
+            <div class="form-group">
+                <label for="nome">Nome</label>
+                <input type="text" id="nome" required>
+            </div>
+
+            <div class="form-group">
+                <label for="categoria">Categoria</label>
+                <input type="text" id="categoria" placeholder="Ex: Roupa, Eletrônico, Alimento" required>
+            </div>
+
+            <div class="form-group">
+                <label for="quantidade">Quantidade</label>
+                <input type="number" id="quantidade" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="preco">Preço</label>
+                <input type="number" id="preco" min="0" step="0.01" required>
+            </div>
+
+            <div id="atributos-container">
+                <label>Atributos extras (específicos da categoria)</label>
+            </div>
+
+            <button type="button" id="add-atributo">
+                + Adicionar atributo
+            </button>
+
+            <br><br>
+
+            <button type="submit" id="submit-btn">
+                Salvar produto
+            </button>
+
+            <button type="button" id="cancelar-edicao" style="display: none;">
+                Cancelar edição
+            </button>
+
+        </form>
+
+        <p id="form-message"></p>
+
+        <hr style="margin: 20px 0;">
+
+        <h2>Produtos em estoque</h2>
+
+        <div id="produtos-lista"></div>
+
+    </main>
+
+    <script type="module" src="js/painel.js"></script>
+
+</body>
+</html>
