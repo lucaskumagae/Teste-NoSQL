@@ -1,9 +1,12 @@
 import { initializeApp } from
     "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
-
+ 
 import { getAuth } from
     "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
-
+ 
+import { getFirestore } from
+    "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+ 
 const firebaseConfig = {
     apiKey: "AIzaSyACZDndXYoJSnwR0W65wbN-4LzAg_U5BtE",
     authDomain: "estudo-nosql-c92b0.firebaseapp.com",
@@ -12,7 +15,8 @@ const firebaseConfig = {
     messagingSenderId: "400576692052",
     appId: "1:400576692052:web:6781198c193a334862d2c1"
 };
-
+ 
 const app = initializeApp(firebaseConfig);
-
+ 
 export const auth = getAuth(app);
+export const db = getFirestore(app);
