@@ -10,6 +10,7 @@ import {
     addDoc,
     updateDoc,
     deleteDoc,
+    arrayRemove,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
@@ -17,6 +18,8 @@ import { auth, db } from "./firebase-config.js";
 
 let galpaoId = null;
 let atributosCount = 0;
+let souAdmin = false;
+let uidAtual = null;
 
 const galpaoNomeEl = document.getElementById("galpao-nome");
 const galpaoCodigoEl = document.getElementById("galpao-codigo");
@@ -30,6 +33,7 @@ const cancelarBtn = document.getElementById("cancelar-edicao");
 const atributosContainer = document.getElementById("atributos-container");
 
 const produtosListaEl = document.getElementById("produtos-lista");
+const membrosListaEl = document.getElementById("membros-lista");
 
 // ─── VERIFICA LOGIN E CARREGA O GALPÃO ───
 
@@ -39,6 +43,8 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "login.html";
         return;
     }
+
+    uidAtual = user.uid;
 
     const usuarioSnap = await getDoc(doc(db, "usuarios", user.uid));
     const usuarioData = usuarioSnap.data();
@@ -66,14 +72,77 @@ onAuthStateChanged(auth, async (user) => {
     galpaoNomeEl.textContent = galpaoData.nome;
     galpaoCodigoEl.textContent = galpaoId;
 
+    // O criador do galpão é o admin: só ele pode remover membros
+    // e deletar produtos (ver regras do Firestore).
+    souAdmin = galpaoData.criadoPor === uidAtual;
+
     // Só mostra o link de trocar de galpão se o usuário tiver mais de um.
     if (galpaoIds.length > 1) {
         trocarGalpaoEl.style.display = "inline-block";
     }
 
+    renderizarMembros(galpaoData.membros || [], galpaoData.criadoPor);
     escutarProdutos();
 
 });
+
+// ─── MEMBROS DO GALPÃO ───
+
+function renderizarMembros(membros, criadoPor) {
+
+    if (!membrosListaEl) return;
+
+    membrosListaEl.innerHTML = "";
+
+    membros.forEach((uid) => {
+
+        const linha = document.createElement("div");
+        linha.style.display = "flex";
+        linha.style.justifyContent = "space-between";
+        linha.style.alignItems = "center";
+        linha.style.marginBottom = "6px";
+
+        const rotulo = uid === uidAtual ? `${uid} (você)` : uid;
+        const cargo = uid === criadoPor ? " — admin" : "";
+
+        linha.innerHTML = `<span>${rotulo}${cargo}</span>`;
+
+        // Só o admin pode remover membros, e não pode remover a si mesmo.
+        if (souAdmin && uid !== criadoPor) {
+            const btnRemover = document.createElement("button");
+            btnRemover.textContent = "Remover";
+            btnRemover.addEventListener("click", () => removerMembro(uid));
+            linha.appendChild(btnRemover);
+        }
+
+        membrosListaEl.appendChild(linha);
+
+    });
+
+}
+
+async function removerMembro(uid) {
+
+    if (!confirm("Remover este membro do galpão?")) {
+        return;
+    }
+
+    try {
+        const galpaoRef = doc(db, "galpoes", galpaoId);
+        await updateDoc(galpaoRef, {
+            membros: arrayRemove(uid)
+        });
+
+        const galpaoSnap = await getDoc(galpaoRef);
+        const galpaoData = galpaoSnap.data();
+        renderizarMembros(galpaoData.membros || [], galpaoData.criadoPor);
+
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao remover membro.");
+    }
+
+}
 
 // ─── LOGOUT ───
 
@@ -216,14 +285,16 @@ function escutarProdutos() {
                 ${atributosTexto ? "Atributos: " + atributosTexto : ""}
                 <br><br>
                 <button class="editar-btn">Editar</button>
-                <button class="deletar-btn">Deletar</button>
+                ${souAdmin ? '<button class="deletar-btn">Deletar</button>' : ""}
             `;
 
             card.querySelector(".editar-btn")
                 .addEventListener("click", () => preencherEdicao(id, produto));
 
-            card.querySelector(".deletar-btn")
-                .addEventListener("click", () => deletarProduto(id));
+            const btnDeletar = card.querySelector(".deletar-btn");
+            if (btnDeletar) {
+                btnDeletar.addEventListener("click", () => deletarProduto(id));
+            }
 
             produtosListaEl.appendChild(card);
 

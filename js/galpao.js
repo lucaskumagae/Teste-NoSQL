@@ -48,10 +48,12 @@ criarForm.addEventListener("submit", async (event) => {
 
         // Cria o galpão em uma coleção separada.
         // addDoc gera um ID automático — esse ID é o "código" do galpão.
+        // O criador entra automaticamente como membro (e é o admin, via criadoPor).
         const novoGalpao = await addDoc(collection(db, "galpoes"), {
             nome: nome,
             endereco: endereco,
             criadoPor: uid,
+            membros: [uid],
             criadoEm: new Date().toISOString()
         });
 
@@ -94,6 +96,12 @@ entrarForm.addEventListener("submit", async (event) => {
             entrarMessage.textContent = "Código de galpão inválido.";
             return;
         }
+
+        // Adiciona o usuário à lista de membros do galpão
+        // (é isso que dá a ele acesso aos produtos, via regras do Firestore).
+        await updateDoc(galpaoRef, {
+            membros: arrayUnion(uid)
+        });
 
         await updateDoc(doc(db, "usuarios", uid), {
             galpaoIds: arrayUnion(codigo)
