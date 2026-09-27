@@ -198,14 +198,12 @@ galpoes/{galpaoId}                     nome, endereco, criadoPor, membros[], pap
 
 ## Regras de segurança
 
-As regras ficam em [`firestore.rules`](firestore.rules). **Publique-as antes de usar a nova versão**
-(as regras antigas bloqueiam, por exemplo, o registro de nomes da equipe):
+As regras ficam em [`firestore.rules`](firestore.rules). 
 
+Meios de aplicação:
 - pelo console: Firebase → Firestore → Regras → colar o conteúdo e publicar; ou
-- pela CLI: `firebase deploy --only firestore:rules`
+- pela CLI: `firebase deploy --only firestore:rules` (Não testei esse método)
 
-> Publique as regras junto com o código novo: a versão antiga do site grava saldo sem
-> movimentação, o que as regras novas recusam.
 
 ## Rodando localmente com emuladores
 
