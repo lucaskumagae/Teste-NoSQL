@@ -4,78 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Galpão</title>
+    <title>Seu galpão · Galpão</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
 
-    <main class="login-container">
+    <main class="auth-page">
 
-        <section class="login-card">
+        <section class="auth-card">
+
+            <div class="topo">
+                <span class="marca"><span class="marca-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-8h10v8M7 17h10"/></svg></span> Galpão</span>
+                <button id="logout-btn" type="button" class="btn-ghost btn-sm">Sair</button>
+            </div>
 
             <h1>Seu galpão</h1>
-
-            <p>Crie um galpão novo ou entre em um existente</p>
-
-            <button id="logout-btn" style="width: auto; padding: 8px 16px;">
-                Sair
-            </button>
+            <p class="muted">Crie um galpão novo ou entre em um existente com o código de convite.</p>
 
             <form id="criar-galpao-form">
 
                 <div class="form-group">
                     <label for="nome-galpao">Nome do galpão</label>
-
-                    <input
-                        type="text"
-                        id="nome-galpao"
-                        placeholder="Ex: Galpão Central"
-                        required
-                    >
+                    <input type="text" id="nome-galpao" placeholder="Ex: Galpão Central" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="endereco-galpao">Endereço</label>
-
-                    <input
-                        type="text"
-                        id="endereco-galpao"
-                        placeholder="Ex: Rua das Flores, 123"
-                    >
+                    <label for="endereco-galpao">Endereço <span class="subtle">(opcional)</span></label>
+                    <input type="text" id="endereco-galpao" placeholder="Ex: Rua das Flores, 123">
                 </div>
 
-                <button type="submit">
-                    Criar galpão
-                </button>
+                <button type="submit" class="btn-block">Criar galpão</button>
+
+                <p id="criar-message" class="form-message"></p>
 
             </form>
 
-            <p id="criar-message"></p>
-
-            <hr style="margin: 20px 0;">
+            <div class="divisor">ou</div>
 
             <form id="entrar-galpao-form">
 
                 <div class="form-group">
-                    <label for="codigo-galpao">Código do galpão</label>
-
-                    <input
-                        type="text"
-                        id="codigo-galpao"
-                        placeholder="Cole o código recebido"
-                        required
-                    >
+                    <label for="codigo-galpao">Código de convite</label>
+                    <input type="text" id="codigo-galpao" placeholder="Cole o código recebido" class="mono" required>
                 </div>
 
-                <button type="submit">
-                    Entrar no galpão
-                </button>
+                <button type="submit" class="btn-secondary btn-block">Entrar no galpão</button>
+
+                <p id="entrar-message" class="form-message"></p>
 
             </form>
 
-            <p id="entrar-message"></p>
+            <p class="rodape hidden" id="voltar-painel">
+                <a href="selecionar-galpao.html">← Voltar aos meus galpões</a>
+            </p>
 
         </section>
 

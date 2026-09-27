@@ -4,61 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Login</title>
+    <title>Entrar · Galpão</title>
 
-    <link rel="stylesheet" href=" css/style.css">
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
-    <main class="login-container">
+    <main class="auth-page">
 
-        <section class="login-card">
+        <section class="auth-card">
+
+            <div class="topo">
+                <span class="marca"><span class="marca-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-8h10v8M7 17h10"/></svg></span> Galpão</span>
+            </div>
+
             <h1>Entrar</h1>
-
-            <p>Entre na sua conta</p>
+            <p class="muted">Acesse o estoque dos seus galpões.</p>
 
             <form id="login-form">
 
                 <div class="form-group">
-
                     <label for="email">E-mail</label>
-                    
-                        <input
-                            type="email"
-                            id="email"
-                            placeholder="seu@email.com"
-                            required
-                            >
-                    
-                    <label for="password">Senha</label>
-
-                        <input
-                            type="password"
-                            id="password"
-                            placeholder="Sua senha"
-                            required
-                        >
+                    <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" required>
                 </div>
 
-                <button type="submit">
-                    Entrar
-                </button>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" placeholder="Sua senha" autocomplete="current-password" required>
+                </div>
 
-                <p id="login-message"></p>
+                <button type="submit" class="btn-block">Entrar</button>
 
-                <p>
-                    Ainda não possui uma conta?
-                    <a href="cadastro.html">Cadastre-se</a>
-                </p>
+                <p id="login-message" class="form-message"></p>
 
             </form>
+
+            <p class="rodape">
+                Ainda não possui uma conta?
+                <a href="cadastro.html">Cadastre-se</a>
+            </p>
 
         </section>
 
     </main>
-    
+
     <script type="module" src="js/login.js"></script>
-    
+
 </body>
 </html>

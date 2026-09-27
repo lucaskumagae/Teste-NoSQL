@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 import { auth, db } from "./firebase-config.js";
+import { mensagem } from "./ui.js";
 
 const form = document.getElementById("register-form");
 
@@ -49,8 +50,7 @@ form.addEventListener("submit", async (event) => {
             criadoEm: new Date().toISOString()
         });
 
-        message.textContent =
-            "Conta criada com sucesso!";
+        mensagem(message, "Conta criada com sucesso!", "ok");
 
         window.location.href = "galpao.html";
 
@@ -58,8 +58,7 @@ form.addEventListener("submit", async (event) => {
 
         console.error(error);
 
-        message.textContent =
-            "Erro ao criar a conta.";
+        mensagem(message, "Erro ao criar a conta.", "erro");
 
     }
 

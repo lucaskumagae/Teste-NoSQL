@@ -1,0 +1,297 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// Modelo:
+//   usuarios/{uid}
+//   galpoes/{galpaoId}                       (membros, papeis, membrosInfo)
+//     produtos/{produtoId}
+//       movimentacoes/{movId}                (entrada, saida, devolucao, ajuste)
+//     pedidos/{pedidoId}
+//     reconciliacoes/{recId}
+//
+// Papéis (galpoes.papeis[uid]); quem não tem papel definido é "membro".
+// O criador do galpão (criadoPor) é sempre admin.
+//   admin      → tudo, incluindo gerenciar membros e papéis
+//   gerente    → produtos, todas as movimentações, aprovar pedidos, relatórios
+//   conferente → cadastrar/editar produtos, registrar entrada e devolução
+//   separador  → registrar saída, separar e expedir pedidos
+//   membro     → visualizar estoque e solicitar pedidos
+//
+// Integridade do estoque: a quantidade de um produto só muda se, NA MESMA
+// transação, for criada uma movimentação cujo "delta" explique a mudança.
+// Assim o histórico nunca fica fora de sincronia com o saldo.
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── USUÁRIOS ───
+    // Cada usuário só pode ler/criar/editar o PRÓPRIO documento.
+    match /usuarios/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    // impede que o usuário se auto-vincule a galpões na criação
+                    && (!("galpaoIds" in request.resource.data)
+                        || request.resource.data.galpaoIds == []);
+      allow delete: if false;
+    }
+
+    // ─── GALPÕES ───
+    match /galpoes/{galpaoId} {
+
+      // ── Helpers usados pelas subcoleções ──
+
+      function dadosGalpao() {
+        return get(/databases/$(database)/documents/galpoes/$(galpaoId)).data;
+      }
+
+      function souMembro() {
+        return request.auth != null
+               && request.auth.uid in dadosGalpao().membros;
+      }
+
+      function meuPapel() {
+        let g = dadosGalpao();
+        return g.criadoPor == request.auth.uid
+               ? "admin"
+               : g.get("papeis", {}).get(request.auth.uid, "membro");
+      }
+
+      function temPapel(papeis) {
+        return souMembro() && meuPapel() in papeis;
+      }
+
+      // ── Regras do documento do galpão ──
+
+      // Admin = criador OU alguém promovido a admin pelo mapa de papéis.
+      function ehAdmin() {
+        return request.auth != null
+               && (resource.data.criadoPor == request.auth.uid
+                   || (request.auth.uid in resource.data.membros
+                       && resource.data.get("papeis", {}).get(request.auth.uid, "") == "admin"));
+      }
+
+      // Admin pode tudo, mas não pode trocar o criador nem removê-lo.
+      function adminAlterouValido() {
+        return request.resource.data.criadoPor == resource.data.criadoPor
+               && resource.data.criadoPor in request.resource.data.membros;
+      }
+
+      // Diferença entre o mapa antigo e o novo afeta apenas a própria chave.
+      function mapaMudouSoMinhaChave(campo) {
+        return request.resource.data.get(campo, {})
+                 .diff(resource.data.get(campo, {}))
+                 .affectedKeys().hasOnly([request.auth.uid]);
+      }
+
+      // Fluxo "entrar com código": o usuário só pode se auto-adicionar
+      // em "membros" (e registrar o próprio nome em "membrosInfo").
+      function entrouSozinho() {
+        let antigos = resource.data.membros;
+        let novos = request.resource.data.membros;
+        return request.auth != null
+               && request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(["membros", "membrosInfo"])
+               && novos.size() == antigos.size() + 1
+               && novos.removeAll(antigos).hasOnly([request.auth.uid])
+               && antigos.removeAll(novos).size() == 0
+               && mapaMudouSoMinhaChave("membrosInfo");
+      }
+
+      // Um membro pode atualizar apenas o próprio nome/e-mail exibido.
+      function atualizouProprioPerfil() {
+        return request.auth != null
+               && request.auth.uid in resource.data.membros
+               && request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(["membrosInfo"])
+               && mapaMudouSoMinhaChave("membrosInfo");
+      }
+
+      // "Sair do galpão": remove o próprio uid de membros/papéis/info.
+      // O criador não pode sair (precisa continuar existindo um admin).
+      function saiuSozinho() {
+        return request.auth != null
+               && request.auth.uid in resource.data.membros
+               && resource.data.criadoPor != request.auth.uid
+               && request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(["membros", "membrosInfo", "papeis"])
+               && request.resource.data.membros == resource.data.membros.removeAll([request.auth.uid])
+               && mapaMudouSoMinhaChave("membrosInfo")
+               && mapaMudouSoMinhaChave("papeis")
+               && !(request.auth.uid in request.resource.data.get("papeis", {}))
+               && !(request.auth.uid in request.resource.data.get("membrosInfo", {}));
+      }
+
+      // Qualquer usuário logado pode ler um galpão pelo ID
+      // (necessário para o fluxo "entrar com código").
+      allow get: if request.auth != null;
+
+      // Ninguém pode listar todos os galpões (evita vazar todos os códigos).
+      allow list: if false;
+
+      // Criar: usuário logado, precisa se declarar criador/admin
+      // e já entrar como único membro inicial.
+      allow create: if request.auth != null
+                    && request.resource.data.criadoPor == request.auth.uid
+                    && request.resource.data.membros == [request.auth.uid]
+                    && request.resource.data.get("papeis", {}).keys()
+                         .hasOnly([request.auth.uid]);
+
+      allow update: if (ehAdmin() && adminAlterouValido())
+                    || entrouSozinho()
+                    || atualizouProprioPerfil()
+                    || saiuSozinho();
+
+      // Deletar o galpão: só o admin.
+      allow delete: if ehAdmin();
+
+      // ─── PRODUTOS ───
+      match /produtos/{produtoId} {
+
+        function novo() {
+          return request.resource.data;
+        }
+
+        function movPath(movId) {
+          return /databases/$(database)/documents/galpoes/$(galpaoId)/produtos/$(produtoId)/movimentacoes/$(movId);
+        }
+
+        // A movimentação apontada por ultimaMovId foi criada NESTA mesma
+        // requisição (criadoEm == request.time) e o delta dela explica
+        // exatamente a mudança de quantidade.
+        function movExplica(qtdAntiga) {
+          let mov = getAfter(movPath(novo().ultimaMovId));
+          return mov != null
+                 && mov.data.criadoEm == request.time
+                 && mov.data.delta == novo().quantidade - qtdAntiga;
+        }
+
+        function quantidadeValida() {
+          return novo().quantidade is int && novo().quantidade >= 0;
+        }
+
+        function statusValido() {
+          return novo().get("status", "em_estoque")
+                   in ["em_estoque", "reservado", "em_separacao", "expedido", "devolvido"];
+        }
+
+        // Separador só mexe no que o fluxo de saída/pedido exige.
+        function camposPermitidosParaMeuPapel() {
+          let alterados = novo().diff(resource.data).affectedKeys();
+          return meuPapel() in ["admin", "gerente", "conferente"]
+                 || (meuPapel() == "separador"
+                     && alterados.hasOnly(["quantidade", "ultimaMovId", "status", "atualizadoEm"]));
+        }
+
+        allow read: if souMembro();
+
+        allow create: if temPapel(["admin", "gerente", "conferente"])
+                      && quantidadeValida()
+                      && statusValido()
+                      && (novo().quantidade == 0 || movExplica(0));
+
+        allow update: if souMembro()
+                      && quantidadeValida()
+                      && statusValido()
+                      && camposPermitidosParaMeuPapel()
+                      && (novo().quantidade == resource.data.quantidade
+                          || movExplica(resource.data.quantidade));
+
+        // Só o admin do galpão pode deletar produtos.
+        allow delete: if temPapel(["admin"]);
+
+        // ─── MOVIMENTAÇÕES (histórico imutável) ───
+        match /movimentacoes/{movId} {
+
+          function m() {
+            return request.resource.data;
+          }
+
+          function papelPodeTipo() {
+            return (m().tipo in ["entrada", "devolucao"] && meuPapel() in ["admin", "gerente", "conferente"])
+                || (m().tipo == "saida"                   && meuPapel() in ["admin", "gerente", "separador"])
+                || (m().tipo == "ajuste"                  && meuPapel() in ["admin", "gerente"]);
+          }
+
+          // Devolução "avariado" entra no histórico mas NÃO volta ao saldo.
+          function deltaCoerente() {
+            return (m().tipo == "entrada"   && m().delta == m().quantidade)
+                || (m().tipo == "saida"     && m().delta == -m().quantidade)
+                || (m().tipo == "devolucao" && m().motivo == "avariado" && m().delta == 0)
+                || (m().tipo == "devolucao" && m().motivo != "avariado" && m().delta == m().quantidade)
+                || (m().tipo == "ajuste"    && (m().delta == m().quantidade || m().delta == -m().quantidade));
+          }
+
+          function motivoValido() {
+            return m().tipo != "devolucao"
+                   || m().motivo in ["avariado", "excesso", "erro_pedido", "outro"];
+          }
+
+          allow read: if souMembro();
+
+          allow create: if souMembro()
+                        && papelPodeTipo()
+                        && m().uid == request.auth.uid
+                        && m().quantidade is int && m().quantidade > 0
+                        && m().delta is int
+                        && deltaCoerente()
+                        && motivoValido()
+                        && m().criadoEm == request.time
+                        // o produto precisa apontar para esta movimentação
+                        // ao final da transação (não existe movimentação "solta")
+                        && getAfter(/databases/$(database)/documents/galpoes/$(galpaoId)/produtos/$(produtoId))
+                             .data.ultimaMovId == movId;
+
+          allow update, delete: if false;
+        }
+      }
+
+      // ─── PEDIDOS INTERNOS ───
+      match /pedidos/{pedidoId} {
+
+        function transicao(de, para) {
+          return resource.data.status == de && request.resource.data.status == para;
+        }
+
+        function transicaoPermitida() {
+          let souSolicitante = resource.data.solicitante == request.auth.uid;
+          return (transicao("pendente", "cancelado") && (souSolicitante || meuPapel() in ["admin", "gerente"]))
+              || (transicao("pendente", "aprovado")  && meuPapel() in ["admin", "gerente"])
+              || (transicao("pendente", "rejeitado") && meuPapel() in ["admin", "gerente"])
+              || (transicao("aprovado", "em_separacao")  && meuPapel() in ["admin", "gerente", "separador"])
+              || (transicao("em_separacao", "expedido")  && meuPapel() in ["admin", "gerente", "separador"])
+              || (transicao("aprovado", "cancelado")     && meuPapel() in ["admin", "gerente"])
+              || (transicao("em_separacao", "cancelado") && meuPapel() in ["admin", "gerente"]);
+        }
+
+        allow read: if souMembro();
+
+        // Limite de itens: a expedição grava tudo numa única transação e as
+        // regras permitem no máximo 20 leituras auxiliares por transação.
+        allow create: if souMembro()
+                      && request.resource.data.solicitante == request.auth.uid
+                      && request.resource.data.status == "pendente"
+                      && request.resource.data.itens is list
+                      && request.resource.data.itens.size() > 0
+                      && request.resource.data.itens.size() <= 8;
+
+        allow update: if souMembro()
+                      && transicaoPermitida()
+                      && request.resource.data.solicitante == resource.data.solicitante
+                      && request.resource.data.itens == resource.data.itens
+                      && request.resource.data.criadoEm == resource.data.criadoEm;
+
+        allow delete: if false;
+      }
+
+      // ─── RECONCILIAÇÕES DE INVENTÁRIO ───
+      match /reconciliacoes/{recId} {
+        allow read: if temPapel(["admin", "gerente"]);
+        allow create: if temPapel(["admin", "gerente"])
+                      && request.resource.data.uid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

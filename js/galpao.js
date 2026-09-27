@@ -13,6 +13,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 import { auth, db } from "./firebase-config.js";
+import { mensagem } from "./ui.js";
 
 const criarForm = document.getElementById("criar-galpao-form");
 const criarMessage = document.getElementById("criar-message");
@@ -20,10 +21,34 @@ const criarMessage = document.getElementById("criar-message");
 const entrarForm = document.getElementById("entrar-galpao-form");
 const entrarMessage = document.getElementById("entrar-message");
 
+// Nome/e-mail do usuário logado — gravados no galpão para a equipe
+// enxergar nomes em vez de UIDs.
+let meuPerfil = null;
+
+// Se o formulário for enviado antes do perfil carregar, usa o e-mail.
+function perfil() {
+    const email = auth.currentUser.email;
+    return meuPerfil || { nome: email, email };
+}
+
 // Bloqueia o acesso a essa página se não houver usuário logado.
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (!user) {
         window.location.href = "login.html";
+        return;
+    }
+
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    const dados = snap.data() || {};
+
+    meuPerfil = {
+        nome: dados.nome || user.email,
+        email: dados.email || user.email
+    };
+
+    // Quem já tem galpões ganha um atalho de volta.
+    if ((dados.galpaoIds || []).length > 0) {
+        document.getElementById("voltar-painel").classList.remove("hidden");
     }
 });
 
@@ -39,8 +64,8 @@ criarForm.addEventListener("submit", async (event) => {
 
     event.preventDefault();
 
-    const nome = document.getElementById("nome-galpao").value;
-    const endereco = document.getElementById("endereco-galpao").value;
+    const nome = document.getElementById("nome-galpao").value.trim();
+    const endereco = document.getElementById("endereco-galpao").value.trim();
 
     const uid = auth.currentUser.uid;
 
@@ -54,6 +79,7 @@ criarForm.addEventListener("submit", async (event) => {
             endereco: endereco,
             criadoPor: uid,
             membros: [uid],
+            membrosInfo: { [uid]: perfil() },
             criadoEm: new Date().toISOString()
         });
 
@@ -62,15 +88,14 @@ criarForm.addEventListener("submit", async (event) => {
             galpaoIds: arrayUnion(novoGalpao.id)
         });
 
-        criarMessage.textContent =
-            "Galpão criado! Código: " + novoGalpao.id;
+        mensagem(criarMessage, "Galpão criado! Abrindo…", "ok");
 
         window.location.href = "painel.html?galpao=" + novoGalpao.id;
 
     } catch (error) {
 
         console.error(error);
-        criarMessage.textContent = "Erro ao criar o galpão.";
+        mensagem(criarMessage, "Erro ao criar o galpão.", "erro");
 
     }
 
@@ -93,28 +118,32 @@ entrarForm.addEventListener("submit", async (event) => {
         const galpaoSnap = await getDoc(galpaoRef);
 
         if (!galpaoSnap.exists()) {
-            entrarMessage.textContent = "Código de galpão inválido.";
+            mensagem(entrarMessage, "Código de galpão inválido.", "erro");
             return;
         }
 
         // Adiciona o usuário à lista de membros do galpão
         // (é isso que dá a ele acesso aos produtos, via regras do Firestore).
-        await updateDoc(galpaoRef, {
-            membros: arrayUnion(uid)
-        });
+        // Quem já é membro não precisa ser adicionado de novo.
+        if (!(galpaoSnap.data().membros || []).includes(uid)) {
+            await updateDoc(galpaoRef, {
+                membros: arrayUnion(uid),
+                [`membrosInfo.${uid}`]: perfil()
+            });
+        }
 
         await updateDoc(doc(db, "usuarios", uid), {
             galpaoIds: arrayUnion(codigo)
         });
 
-        entrarMessage.textContent = "Você entrou no galpão!";
+        mensagem(entrarMessage, "Você entrou no galpão!", "ok");
 
         window.location.href = "painel.html?galpao=" + codigo;
 
     } catch (error) {
 
         console.error(error);
-        entrarMessage.textContent = "Erro ao entrar no galpão.";
+        mensagem(entrarMessage, "Erro ao entrar no galpão.", "erro");
 
     }
 

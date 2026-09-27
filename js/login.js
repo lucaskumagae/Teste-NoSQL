@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 import { auth, db } from "./firebase-config.js";
+import { mensagem } from "./ui.js";
 
 const form = document.getElementById("login-form");
 
@@ -36,8 +37,7 @@ form.addEventListener("submit", async (event) => {
 
         console.log("Usuário conectado:", uid);
 
-        message.textContent =
-            "Login realizado com sucesso!";
+        mensagem(message, "Login realizado com sucesso!", "ok");
 
         // Busca o documento do usuário pra saber quantos galpões ele tem.
         const usuarioSnap = await getDoc(doc(db, "usuarios", uid));
@@ -59,8 +59,7 @@ form.addEventListener("submit", async (event) => {
 
         console.error(error);
 
-        message.textContent =
-            "E-mail ou senha incorretos.";
+        mensagem(message, "E-mail ou senha incorretos.", "erro");
 
     }
 

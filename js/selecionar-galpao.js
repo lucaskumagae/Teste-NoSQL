@@ -9,6 +9,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
 import { auth, db } from "./firebase-config.js";
+import { esc } from "./ui.js";
+import { papelDe, badgePapel } from "./permissoes.js";
 
 const galpoesListaEl = document.getElementById("galpoes-lista");
 
@@ -29,39 +31,31 @@ onAuthStateChanged(auth, async (user) => {
         return;
     }
 
-    if (galpaoIds.length === 1) {
-        window.location.href = "painel.html?galpao=" + galpaoIds[0];
-        return;
-    }
+    // Busca os dados de cada galpão (em paralelo) pra mostrar o nome, não só o ID.
+    const snaps = await Promise.all(
+        galpaoIds.map((id) => getDoc(doc(db, "galpoes", id)).catch(() => null))
+    );
 
-    // Busca os dados de cada galpão pra mostrar o nome, não só o ID.
-    for (const galpaoId of galpaoIds) {
+    const cards = snaps
+        .map((snap, i) => ({ snap, id: galpaoIds[i] }))
+        // Ignora galpões apagados ou dos quais o usuário foi removido.
+        .filter(({ snap }) => snap && snap.exists() && (snap.data().membros || []).includes(user.uid))
+        .map(({ snap, id }) => {
+            const galpao = snap.data();
+            return `
+                <a class="galpao-opcao" href="painel.html?galpao=${encodeURIComponent(id)}">
+                    <span>
+                        <strong>${esc(galpao.nome)}</strong><br>
+                        <span class="subtle">${esc(galpao.endereco || "Sem endereço")} · ${(galpao.membros || []).length} membro(s)</span>
+                    </span>
+                    ${badgePapel(papelDe(galpao, user.uid))}
+                </a>
+            `;
+        });
 
-        const galpaoSnap = await getDoc(doc(db, "galpoes", galpaoId));
-
-        if (!galpaoSnap.exists()) {
-            continue;
-        }
-
-        const galpao = galpaoSnap.data();
-
-        const card = document.createElement("a");
-        card.href = "painel.html?galpao=" + galpaoId;
-        card.style.display = "block";
-        card.style.border = "1px solid #ccc";
-        card.style.borderRadius = "5px";
-        card.style.padding = "10px";
-        card.style.marginBottom = "10px";
-        card.style.color = "inherit";
-
-        card.innerHTML = `
-            <strong>${galpao.nome}</strong><br>
-            Código: ${galpaoId}
-        `;
-
-        galpoesListaEl.appendChild(card);
-
-    }
+    galpoesListaEl.innerHTML = cards.length
+        ? cards.join("")
+        : `<p class="muted">Você não participa de nenhum galpão ativo.</p>`;
 
 });
 
