@@ -1044,6 +1044,135 @@ tr.divergente td {
     font-size: .8rem;
 }
 
+/* ─── Códigos curtos de peça ─── */
+
+.codigo-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    font-family: var(--mono);
+    font-size: .74rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+}
+
+.codigo-chip.novo {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+.codigos-lista {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+
+/* Itens individuais aparecem logo abaixo do produto de origem */
+tr.linha-individual td:first-child {
+    padding-left: 30px;
+    background-image: linear-gradient(var(--border-strong), var(--border-strong));
+    background-repeat: no-repeat;
+    background-size: 2px 60%;
+    background-position: 16px center;
+}
+
+.pedido.destaque {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.toolbar-simples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.toolbar-simples input[type="search"] {
+    flex: 1 1 200px;
+    max-width: 280px;
+}
+
+/* ─── Etiquetas em lote e guia de saída ─── */
+
+.etiqueta .etiqueta-codigo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+}
+
+.etiquetas-lote {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+}
+
+.etiquetas-lote .etiqueta {
+    padding: 10px;
+    break-inside: avoid;
+}
+
+.etiquetas-lote .etiqueta svg {
+    width: 130px;
+    height: 130px;
+}
+
+.guia {
+    padding: 16px;
+    color: #111;
+    background: #fff;
+    border: 1px solid var(--border);
+}
+
+.guia table th {
+    color: #555;
+    background: #f4f4f5;
+}
+
+.guia table td {
+    border-color: #e4e4e7;
+}
+
+/* A guia é um "papel" branco: sem o destaque de linha das outras tabelas,
+   que no modo escuro deixaria o texto ilegível. */
+.guia tbody tr:hover {
+    background: transparent;
+}
+
+.guia-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.guia-titulo {
+    font-family: var(--font-titulo);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: .8rem;
+}
+
+.guia-codigo {
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.guia-qr svg {
+    width: 110px;
+    height: 110px;
+}
+
 /* ─── Equipe ─── */
 
 .membro-linha {

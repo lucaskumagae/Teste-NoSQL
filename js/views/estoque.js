@@ -1,15 +1,18 @@
 // Aba "Estoque": indicadores, busca/filtros e lista de produtos.
 
 import { esc, $, fmt, icone } from "../ui.js";
-import { STATUS_PRODUTO } from "../servicos.js";
+import { STATUS_PRODUTO, CONDICOES, ehIndividual } from "../servicos.js";
 import {
     badgeStatus,
     badgeValidade,
+    badgeCondicao,
+    chipCodigo,
     chipPosicao,
     diasParaVencer,
     abrirFicha,
     abrirFormProduto,
-    lerProdutoPorQr,
+    abrirUnidade,
+    lerQr,
     textoPosicao
 } from "./comum.js";
 
@@ -38,6 +41,11 @@ export function montarEstoque(el, ctx) {
                     ${Object.entries(STATUS_PRODUTO).map(([k, s]) => `<option value="${k}">${s.rotulo}</option>`).join("")}
                     <option value="__vencendo">Vencidos / vencendo</option>
                 </select>
+                <select data-filtro-condicao aria-label="Filtrar por condição">
+                    <option value="">Todas as condições</option>
+                    <option value="__individuais">Só itens individuais</option>
+                    ${Object.entries(CONDICOES).map(([k, c]) => `<option value="${k}">${c.rotulo}</option>`).join("")}
+                </select>
             </div>
             <div class="tabela-wrap" data-tabela></div>
         </div>
@@ -48,16 +56,20 @@ export function montarEstoque(el, ctx) {
     const buscaEl = $("[data-busca]", el);
     const categoriaEl = $("[data-filtro-categoria]", el);
     const statusEl = $("[data-filtro-status]", el);
+    const condicaoEl = $("[data-filtro-condicao]", el);
 
     const btnNovo = $("[data-novo]", el);
     if (btnNovo) btnNovo.addEventListener("click", () => abrirFormProduto(ctx));
 
+    // Etiqueta do produto → ficha. Etiqueta de peça de produto novo → histórico da peça.
     $("[data-ler]", el).addEventListener("click", async () => {
-        const produto = await lerProdutoPorQr(ctx);
-        if (produto) abrirFicha(ctx, produto.id);
+        const r = await lerQr(ctx);
+        if (!r) return;
+        if (r.unidade && !r.unidade.itemId) return abrirUnidade(ctx, r.unidade);
+        if (r.produto) abrirFicha(ctx, r.produto.id);
     });
 
-    [buscaEl, categoriaEl, statusEl].forEach((c) => c.addEventListener("input", renderTabela));
+    [buscaEl, categoriaEl, statusEl, condicaoEl].forEach((c) => c.addEventListener("input", renderTabela));
 
     tabelaEl.addEventListener("click", (e) => {
         const linha = e.target.closest("[data-id]");
@@ -105,9 +117,13 @@ export function montarEstoque(el, ctx) {
         const termo = buscaEl.value.trim().toLowerCase();
         const categoria = categoriaEl.value;
         const status = statusEl.value;
+        const condicao = condicaoEl.value;
 
         return ctx.estado.produtos.filter((p) => {
             if (categoria && p.categoria !== categoria) return false;
+
+            if (condicao === "__individuais" && !ehIndividual(p)) return false;
+            if (condicao && condicao !== "__individuais" && (p.condicao || "novo") !== condicao) return false;
 
             if (status === "__vencendo") {
                 const d = diasParaVencer(p.validade);
@@ -119,7 +135,8 @@ export function montarEstoque(el, ctx) {
             if (!termo) return true;
 
             const texto = [
-                p.nome, p.categoria, p.lote, p.id, textoPosicao(p.posicao),
+                p.nome, p.categoria, p.lote, p.id, p.codigo, p.codigo && p.codigo.replace(/^(.{4})/, "$1-"),
+                textoPosicao(p.posicao), p.estadoObs,
                 ...Object.values(p.atributos || {})
             ].join(" ").toLowerCase();
             return texto.includes(termo);
@@ -157,26 +174,32 @@ export function montarEstoque(el, ctx) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${lista.map((p) => `
-                        <tr data-id="${esc(p.id)}" style="cursor:pointer">
+                    ${lista.map((p) => {
+                        const individual = ehIndividual(p);
+                        return `
+                        <tr data-id="${esc(p.id)}" class="${individual ? "linha-individual" : ""}" style="cursor:pointer">
                             <td>
                                 <div class="produto-nome">${esc(p.nome)}</div>
                                 <div class="produto-meta">
+                                    ${individual ? `${badgeCondicao(p)} ${chipCodigo(p.codigo || p.id)}` : ""}
                                     ${esc(p.categoria || "")}${p.lote ? " · lote " + esc(p.lote) : ""}${p.validade ? " · val. " + fmt.data(p.validade) : ""}
                                     ${badgeValidade(p.validade)}
                                 </div>
                             </td>
                             <td>${chipPosicao(p.posicao)}</td>
                             <td>${badgeStatus(p.status)}</td>
-                            <td class="num"><strong>${fmt.num(p.quantidade)}</strong></td>
+                            <td class="num">${individual
+                                ? `<span class="subtle" style="white-space:nowrap">${p.quantidade === 1 ? "no galpão" : "fora"}</span>`
+                                : `<strong>${fmt.num(p.quantidade)}</strong>`}</td>
                             <td class="num">${fmt.moeda(p.preco)}</td>
                             <td class="acoes-celula">
                                 <button type="button" class="btn-ghost btn-icon" data-acao="ficha" title="Ficha, QR e histórico" aria-label="Ficha de ${esc(p.nome)}">${icone("qr")}</button>
-                                ${podeMov ? `<button type="button" class="btn-ghost btn-icon" data-acao="movimentar" title="Movimentar" aria-label="Movimentar ${esc(p.nome)}">${icone("swap")}</button>` : ""}
+                                ${podeMov && !individual ? `<button type="button" class="btn-ghost btn-icon" data-acao="movimentar" title="Movimentar" aria-label="Movimentar ${esc(p.nome)}">${icone("swap")}</button>` : ""}
                                 ${ctx.pode("editarProduto") ? `<button type="button" class="btn-ghost btn-icon" data-acao="editar" title="Editar" aria-label="Editar ${esc(p.nome)}">${icone("edit")}</button>` : ""}
                             </td>
                         </tr>
-                    `).join("")}
+                    `;
+                    }).join("")}
                 </tbody>
             </table>
         `;

@@ -156,7 +156,11 @@ function escutarProdutos() {
     onSnapshot(colProdutos(estado.galpaoId), (snap) => {
         estado.produtos = snap.docs
             .map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
-            .sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR"));
+            // Por nome; itens individuais logo abaixo do produto novo de mesmo nome.
+            .sort((a, b) =>
+                String(a.nome).localeCompare(String(b.nome), "pt-BR")
+                || Number((a.condicao || "novo") !== "novo") - Number((b.condicao || "novo") !== "novo")
+                || String(a.codigo || "").localeCompare(String(b.codigo || "")));
         estado.produtosCarregados = true;
         notificar("produtos");
     }, (erro) => console.error("produtos:", erro));

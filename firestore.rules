@@ -8,6 +8,7 @@ rules_version = '2';
 //       movimentacoes/{movId}                (entrada, saida, devolucao, ajuste)
 //     pedidos/{pedidoId}
 //     reconciliacoes/{recId}
+//     unidades/{codigo}                    (código curto de cada peça que saiu)
 //
 // Papéis (galpoes.papeis[uid]); quem não tem papel definido é "membro".
 // O criador do galpão (criadoPor) é sempre admin.
@@ -20,6 +21,10 @@ rules_version = '2';
 // Integridade do estoque: a quantidade de um produto só muda se, NA MESMA
 // transação, for criada uma movimentação cujo "delta" explique a mudança.
 // Assim o histórico nunca fica fora de sincronia com o saldo.
+//
+// Condição do produto: "novo" é controlado por quantidade; os demais
+// (aberto, usado, danificado, recondicionado) são ITENS INDIVIDUAIS, com
+// saldo 0 ou 1 — cada peça tem seu próprio cadastro e código.
 // ─────────────────────────────────────────────────────────────
 
 service cloud.firestore {
@@ -176,6 +181,14 @@ service cloud.firestore {
                    in ["em_estoque", "reservado", "em_separacao", "expedido", "devolvido"];
         }
 
+        // Item individual (qualquer condição diferente de "novo") tem no
+        // máximo 1 unidade.
+        function condicaoValida() {
+          let condicao = novo().get("condicao", "novo");
+          return condicao in ["novo", "aberto", "usado", "danificado", "recondicionado"]
+                 && (condicao == "novo" || novo().quantidade <= 1);
+        }
+
         // Separador só mexe no que o fluxo de saída/pedido exige.
         function camposPermitidosParaMeuPapel() {
           let alterados = novo().diff(resource.data).affectedKeys();
@@ -189,11 +202,13 @@ service cloud.firestore {
         allow create: if temPapel(["admin", "gerente", "conferente"])
                       && quantidadeValida()
                       && statusValido()
+                      && condicaoValida()
                       && (novo().quantidade == 0 || movExplica(0));
 
         allow update: if souMembro()
                       && quantidadeValida()
                       && statusValido()
+                      && condicaoValida()
                       && camposPermitidosParaMeuPapel()
                       && (novo().quantidade == resource.data.quantidade
                           || movExplica(resource.data.quantidade));
@@ -214,18 +229,28 @@ service cloud.firestore {
                 || (m().tipo == "ajuste"                  && meuPapel() in ["admin", "gerente"]);
           }
 
-          // Devolução "avariado" entra no histórico mas NÃO volta ao saldo.
+          function produtoDepois() {
+            return getAfter(/databases/$(database)/documents/galpoes/$(galpaoId)/produtos/$(produtoId)).data;
+          }
+
+          // Peça que volta aberta/danificada não retorna ao saldo "novo":
+          // ela só pode entrar num item individual.
+          function devolucaoCoerente() {
+            return m().delta == m().quantidade
+                   && (m().estado == "novo" || produtoDepois().get("condicao", "novo") != "novo");
+          }
+
           function deltaCoerente() {
             return (m().tipo == "entrada"   && m().delta == m().quantidade)
                 || (m().tipo == "saida"     && m().delta == -m().quantidade)
-                || (m().tipo == "devolucao" && m().motivo == "avariado" && m().delta == 0)
-                || (m().tipo == "devolucao" && m().motivo != "avariado" && m().delta == m().quantidade)
+                || (m().tipo == "devolucao" && devolucaoCoerente())
                 || (m().tipo == "ajuste"    && (m().delta == m().quantidade || m().delta == -m().quantidade));
           }
 
           function motivoValido() {
             return m().tipo != "devolucao"
-                   || m().motivo in ["avariado", "excesso", "erro_pedido", "outro"];
+                   || (m().motivo in ["defeito", "excesso", "erro_pedido", "outro"]
+                       && m().estado in ["novo", "aberto", "danificado"]);
           }
 
           allow read: if souMembro();
@@ -240,8 +265,7 @@ service cloud.firestore {
                         && m().criadoEm == request.time
                         // o produto precisa apontar para esta movimentação
                         // ao final da transação (não existe movimentação "solta")
-                        && getAfter(/databases/$(database)/documents/galpoes/$(galpaoId)/produtos/$(produtoId))
-                             .data.ultimaMovId == movId;
+                        && produtoDepois().ultimaMovId == movId;
 
           allow update, delete: if false;
         }
@@ -282,6 +306,15 @@ service cloud.firestore {
                       && request.resource.data.itens == resource.data.itens
                       && request.resource.data.criadoEm == resource.data.criadoEm;
 
+        allow delete: if false;
+      }
+
+      // ─── UNIDADES (código curto de cada peça) ───
+      // Criadas na expedição (separador) e na devolução/cadastro de itens
+      // individuais (conferente). O histórico de cada peça fica em "eventos".
+      match /unidades/{codigo} {
+        allow read: if souMembro();
+        allow create, update: if temPapel(["admin", "gerente", "conferente", "separador"]);
         allow delete: if false;
       }
 

@@ -4,12 +4,15 @@
 import { esc, $, $$, fmt, icone, toast, confirmar, paraDate } from "../ui.js";
 import {
     MOTIVOS_DEVOLUCAO,
+    ESTADOS_DEVOLUCAO,
+    rotuloMotivo,
+    ehIndividual,
     todasMovimentacoes,
     salvarReconciliacao,
     listarReconciliacoes,
     mensagemDeErro
 } from "../servicos.js";
-import { chipPosicao } from "./comum.js";
+import { chipPosicao, badgeCondicao, chipCodigo } from "./comum.js";
 
 // Lista (não objeto) para manter a ordem — chaves numéricas seriam reordenadas.
 const PERIODOS = [[30, "30 dias"], [90, "90 dias"], [365, "12 meses"], [0, "Tudo"]];
@@ -57,7 +60,7 @@ export function montarRelatorios(el, ctx) {
             </div>
 
             <div class="card">
-                <div class="card-topo"><h2>Devoluções por motivo</h2></div>
+                <div class="card-topo"><h2>Devoluções</h2></div>
                 <div class="card-corpo barras-motivo" data-motivos></div>
             </div>
 
@@ -168,8 +171,11 @@ export function montarRelatorios(el, ctx) {
         const porProduto = new Map();
 
         saidas.forEach((m) => {
-            const produto = ctx.produto(m.produtoId);
-            const atual = porProduto.get(m.produtoId) || {
+            // Item individual (aberto, usado…) conta junto com o produto de origem.
+            const proprio = ctx.produto(m.produtoId);
+            const chave = (proprio && proprio.produtoBaseId) || m.produtoId;
+            const produto = ctx.produto(chave) || proprio;
+            const atual = porProduto.get(chave) || {
                 nome: produto ? produto.nome : (m.produtoNome || "(removido)"),
                 produto,
                 unidades: 0,
@@ -177,7 +183,7 @@ export function montarRelatorios(el, ctx) {
             };
             atual.unidades += m.quantidade;
             atual.valor += m.quantidade * (produto ? produto.preco || 0 : 0);
-            porProduto.set(m.produtoId, atual);
+            porProduto.set(chave, atual);
         });
 
         const linhas = [...porProduto.values()].sort((a, b) => b[criterio] - a[criterio]);
@@ -228,27 +234,49 @@ export function montarRelatorios(el, ctx) {
         `;
     }
 
+    // Por que voltou (motivo) e como voltou (estado).
     function renderMotivos(devolucoes) {
-        const contagemMotivo = Object.fromEntries(Object.keys(MOTIVOS_DEVOLUCAO).map((k) => [k, 0]));
-        devolucoes.forEach((m) => {
-            if (m.motivo in contagemMotivo) contagemMotivo[m.motivo] += m.quantidade;
-        });
-        const maior = Math.max(...Object.values(contagemMotivo));
-
-        if (maior === 0) {
+        if (devolucoes.length === 0) {
             motivosEl.innerHTML = `<div class="vazio" style="padding:12px;">Nenhuma devolução no período.</div>`;
             return;
         }
 
-        motivosEl.innerHTML = Object.entries(contagemMotivo)
-            .sort((a, b) => b[1] - a[1])
-            .map(([k, v]) => `
-                <div class="linha">
-                    <span>${MOTIVOS_DEVOLUCAO[k]}</span>
-                    <div class="barra"><span style="width:${(v / maior * 100).toFixed(1)}%"></span></div>
-                    <strong class="num" style="text-align:right">${fmt.num(v)}</strong>
+        const porMotivo = Object.fromEntries(Object.keys(MOTIVOS_DEVOLUCAO).map((k) => [k, 0]));
+        const porEstado = Object.fromEntries(Object.keys(ESTADOS_DEVOLUCAO).map((k) => [k, 0]));
+        let semEstado = 0;
+
+        devolucoes.forEach((m) => {
+            porMotivo[m.motivo] = (porMotivo[m.motivo] || 0) + m.quantidade;
+            if (m.estado in porEstado) porEstado[m.estado] += m.quantidade;
+            else semEstado += m.quantidade;
+        });
+
+        const barras = (contagem, rotulo) => {
+            const maior = Math.max(1, ...Object.values(contagem));
+            return Object.entries(contagem)
+                .sort((a, b) => b[1] - a[1])
+                .map(([k, v]) => `
+                    <div class="linha">
+                        <span>${esc(rotulo(k))}</span>
+                        <div class="barra"><span style="width:${(v / maior * 100).toFixed(1)}%"></span></div>
+                        <strong class="num" style="text-align:right">${fmt.num(v)}</strong>
+                    </div>
+                `).join("");
+        };
+
+        motivosEl.innerHTML = `
+            <div class="grid-2" style="gap:24px;">
+                <div>
+                    <h3 style="margin-bottom:8px;">Por motivo</h3>
+                    ${barras(porMotivo, rotuloMotivo)}
                 </div>
-            `).join("");
+                <div>
+                    <h3 style="margin-bottom:8px;">Por estado em que voltou</h3>
+                    ${barras(porEstado, (k) => ESTADOS_DEVOLUCAO[k].split(" (")[0])}
+                    ${semEstado ? `<p class="subtle" style="margin-top:6px;">${fmt.num(semEstado)} unidade(s) registradas antes do campo “estado”.</p>` : ""}
+                </div>
+            </div>
+        `;
     }
 
     // ─── Reconciliação ───
@@ -287,13 +315,18 @@ export function montarRelatorios(el, ctx) {
                         const contado = contagem.get(p.id);
                         const temContagem = contado !== undefined;
                         const dif = temContagem ? contado - p.quantidade : 0;
+                        const individual = ehIndividual(p);
                         return `
                             <tr class="${temContagem && dif !== 0 ? "divergente" : ""}" data-linha="${esc(p.id)}">
-                                <td><span class="produto-nome">${esc(p.nome)}</span>${p.lote ? `<div class="produto-meta">lote ${esc(p.lote)}</div>` : ""}</td>
+                                <td>
+                                    <span class="produto-nome">${esc(p.nome)}</span>
+                                    ${individual ? `<div class="produto-meta">${badgeCondicao(p)} ${chipCodigo(p.codigo || p.id)}</div>` : ""}
+                                    ${p.lote ? `<div class="produto-meta">lote ${esc(p.lote)}</div>` : ""}
+                                </td>
                                 <td>${chipPosicao(p.posicao)}</td>
                                 <td class="num">${fmt.num(p.quantidade)}</td>
                                 <td class="num">
-                                    <input type="number" class="contagem-input" min="0" step="1"
+                                    <input type="number" class="contagem-input" min="0" step="1" ${individual ? 'max="1"' : ""}
                                         data-contagem="${esc(p.id)}" value="${temContagem ? contado : ""}"
                                         aria-label="Contagem física de ${esc(p.nome)}">
                                 </td>

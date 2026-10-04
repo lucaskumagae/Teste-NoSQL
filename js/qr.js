@@ -5,17 +5,30 @@
 
 import { esc, $, icone } from "./ui.js";
 
-const PREFIXO = "GLP";
+import { ehCodigoValido, normalizarCodigo } from "./codigos.js";
 
-// Conteúdo do QR: GLP|<galpaoId>|<produtoId>
-// Incluir o galpão permite avisar quando alguém lê a etiqueta
-// de um produto de OUTRO galpão.
+// Prefixos do conteúdo dos QR codes:
+//   GLP|<galpaoId>|<produtoId>   etiqueta geral do produto (localizar, contar)
+//   GLU|<galpaoId>|<codigo>      etiqueta de UMA unidade (código curto único)
+//   GLO|<galpaoId>|<pedidoId>    guia de saída de um pedido
+// Incluir o galpão permite avisar quando alguém lê uma etiqueta de OUTRO galpão.
+const PREFIXOS = { GLP: "produtoId", GLU: "codigo", GLO: "pedidoId" };
+
 export function payloadProduto(galpaoId, produtoId) {
-    return `${PREFIXO}|${galpaoId}|${produtoId}`;
+    return `GLP|${galpaoId}|${produtoId}`;
 }
 
-// Aceita o conteúdo completo do QR ou só o ID do produto
-// (útil para digitação manual ou leitor USB que "digita" o código).
+export function payloadUnidade(galpaoId, codigo) {
+    return `GLU|${galpaoId}|${normalizarCodigo(codigo)}`;
+}
+
+export function payloadPedido(galpaoId, pedidoId) {
+    return `GLO|${galpaoId}|${pedidoId}`;
+}
+
+// Devolve { produtoId } | { codigo } | { pedidoId } | { erro }.
+// Também aceita texto digitado: um código curto (K7Q2-M9XD) ou o ID do produto
+// (útil sem câmera ou com leitor USB, que "digita" o código).
 export function lerPayload(texto, galpaoId) {
     const bruto = String(texto || "").trim();
 
@@ -25,11 +38,16 @@ export function lerPayload(texto, galpaoId) {
 
     const partes = bruto.split("|");
 
-    if (partes[0] === PREFIXO && partes.length === 3) {
+    if (PREFIXOS[partes[0]] && partes.length === 3) {
         if (partes[1] !== galpaoId) {
             return { erro: "Esta etiqueta pertence a outro galpão." };
         }
-        return { produtoId: partes[2] };
+        const campo = PREFIXOS[partes[0]];
+        return { [campo]: campo === "codigo" ? normalizarCodigo(partes[2]) : partes[2] };
+    }
+
+    if (ehCodigoValido(bruto)) {
+        return { codigo: normalizarCodigo(bruto) };
     }
 
     return { produtoId: bruto };
@@ -58,7 +76,7 @@ export function montarLeitor(container, aoLer, { continuo = false } = {}) {
             Iniciando câmera…
         </p>
         <form class="scanner-manual" data-manual>
-            <input type="text" placeholder="Ou digite / bipe o código do produto" autocomplete="off" aria-label="Código do produto">
+            <input type="text" placeholder="Ou digite / bipe o código" autocomplete="off" aria-label="Código do produto">
             <button type="submit" class="btn-secondary">OK</button>
         </form>
     `;
