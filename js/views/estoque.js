@@ -182,7 +182,7 @@ export function montarEstoque(el, ctx) {
                                 <div class="produto-nome">${esc(p.nome)}</div>
                                 <div class="produto-meta">
                                     ${individual ? `${badgeCondicao(p)} ${chipCodigo(p.codigo || p.id)}` : ""}
-                                    ${esc(p.categoria || "")}${p.lote ? " · lote " + esc(p.lote) : ""}${p.validade ? " · val. " + fmt.data(p.validade) : ""}
+                                    ${esc(p.categoria || "")}${p.lote ? " · lote " + esc(p.lote) : ""}${p.validade ? " · val. " + esc(fmt.data(p.validade)) : ""}
                                     ${badgeValidade(p.validade)}
                                 </div>
                             </td>

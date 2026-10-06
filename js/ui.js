@@ -38,10 +38,12 @@ export const fmt = {
     },
 
     // Validade é salva como "AAAA-MM-DD" (sem fuso).
+    // Só aceita esse formato: qualquer outra coisa vira "—", nunca o texto
+    // original — ele pode vir de quem gravou direto no banco.
     data(v) {
-        if (!v) return "—";
+        if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return "—";
         const d = new Date(v + "T00:00:00Z");
-        return isNaN(d) ? v : dataCurta.format(d);
+        return isNaN(d) ? "—" : dataCurta.format(d);
     }
 };
 

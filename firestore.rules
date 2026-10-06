@@ -189,6 +189,23 @@ service cloud.firestore {
                  && (condicao == "novo" || novo().quantidade <= 1);
         }
 
+        // Tipos dos campos cadastrais. Além de evitar dados quebrados, impede
+        // que alguém grave código (HTML/JS) em campos que a tela exibe —
+        // por exemplo, uma "validade" que não é uma data.
+        function camposValidos() {
+          let d = novo();
+          let validade = d.get("validade", "");
+          return d.nome is string && d.nome.size() > 0 && d.nome.size() <= 200
+                 && d.get("categoria", "") is string && d.get("categoria", "").size() <= 100
+                 && d.get("preco", 0) is number && d.get("preco", 0) >= 0
+                 && d.get("lote", "") is string && d.get("lote", "").size() <= 100
+                 && validade is string
+                 && (validade == "" || validade.matches("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
+                 && d.get("posicao", {}) is map
+                 && d.get("atributos", {}) is map
+                 && d.get("estadoObs", "") is string;
+        }
+
         // Separador só mexe no que o fluxo de saída/pedido exige.
         function camposPermitidosParaMeuPapel() {
           let alterados = novo().diff(resource.data).affectedKeys();
@@ -203,12 +220,14 @@ service cloud.firestore {
                       && quantidadeValida()
                       && statusValido()
                       && condicaoValida()
+                      && camposValidos()
                       && (novo().quantidade == 0 || movExplica(0));
 
         allow update: if souMembro()
                       && quantidadeValida()
                       && statusValido()
                       && condicaoValida()
+                      && camposValidos()
                       && camposPermitidosParaMeuPapel()
                       && (novo().quantidade == resource.data.quantidade
                           || movExplica(resource.data.quantidade));

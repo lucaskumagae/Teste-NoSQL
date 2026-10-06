@@ -319,7 +319,7 @@ export function montarMovimentar(el, ctx) {
                     <div class="grande">${esc(p.nome)}</div>
                     <div class="subtle">
                         Saldo <strong>${fmt.num(p.quantidade)}</strong>
-                        ${p.lote ? " · lote " + esc(p.lote) : ""}${p.validade ? " · val. " + fmt.data(p.validade) : ""}
+                        ${p.lote ? " · lote " + esc(p.lote) : ""}${p.validade ? " · val. " + esc(fmt.data(p.validade)) : ""}
                     </div>
                     <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
                         ${badgeStatus(p.status)} ${badgeValidade(p.validade)}

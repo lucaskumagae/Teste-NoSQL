@@ -249,7 +249,7 @@ export function abrirFicha(ctx, produtoId) {
                             <tr><td class="muted">Preço unitário</td><td class="num">${fmt.moeda(produto.preco)}</td></tr>
                             <tr><td class="muted">Localização</td><td class="num">${chipPosicao(produto.posicao)}</td></tr>
                             <tr><td class="muted">Lote</td><td class="num">${esc(produto.lote || "—")}</td></tr>
-                            <tr><td class="muted">Validade</td><td class="num">${fmt.data(produto.validade)}</td></tr>
+                            <tr><td class="muted">Validade</td><td class="num">${esc(fmt.data(produto.validade))}</td></tr>
                             ${atributos.map(([k, v]) => `<tr><td class="muted">${esc(k)}</td><td class="num">${esc(v)}</td></tr>`).join("")}
                         </tbody>
                     </table>
@@ -425,7 +425,7 @@ export function abrirFormProduto(ctx, produtoId = null) {
                     </div>
                     <div class="form-group">
                         <label for="fp-preco">Preço unitário (R$)</label>
-                        <input type="number" id="fp-preco" min="0" step="0.01" required value="${p.preco ?? ""}">
+                        <input type="number" id="fp-preco" min="0" step="0.01" required value="${esc(p.preco ?? "")}">
                     </div>
                     <div class="form-group ${individual ? "hidden" : ""}" data-qtd-grupo>
                         <label for="fp-quantidade">${editando ? "Saldo atual" : "Quantidade inicial"}</label>
